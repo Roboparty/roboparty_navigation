@@ -1,0 +1,39 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: roboparty-navigation
+Source: https://github.com/Roboparty/roboparty_navigation
+Comment:
+ The localization implementation is derived from FAST-LIO2. The original
+ FAST-LIO2, ikd-Tree and IKFoM sources carry the copyright of The University
+ of Hong Kong and are distributed under GPL-2.0. The robot-specific history
+ was imported from gitee.com/hitcrt2019_session/rm_sentry_localization_2023.
+ The Nav2 adapter, site tooling and packaging are RoboParty work.
+
+Files: nav2_localization_adapter/*
+Copyright: 2026 Zhang-Yongqi
+License: GPL-3.0-or-later
+
+Files: robots_localization/*
+Copyright: 2019-2023 The University of Hong Kong
+           2022-2026 HIT CRT and RoboParty contributors
+License: GPL-2.0
+
+Files: debian/*
+Copyright: 2026 RoboParty
+License: GPL-3.0-or-later
+
+License: GPL-2.0
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; version 2 of the License.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 2 can be found in "/usr/share/common-licenses/GPL-2".
+
+License: GPL-3.0-or-later
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in "/usr/share/common-licenses/GPL-3".

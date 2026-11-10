@@ -1,0 +1,133 @@
+name: Build RoboParty Navigation Deb Packages
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  ROS_DISTRO: ${{ vars.ROS_DISTRO || 'jazzy' }}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            os: ubuntu-24.04
+          - arch: arm64
+            os: [self-hosted, Linux, ARM64, "24.04"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Version check (package.xml vs changelog)
+        run: |
+          PKG_XML_VERSION=$(grep -oP '<version>\K[^<]+' nav2_localization_adapter/package.xml)
+          CHANGELOG_VERSION=$(head -1 debian/changelog | grep -oP '\((.*?)\)' | tr -d '()' | cut -d'-' -f1)
+
+          echo "package.xml version: $PKG_XML_VERSION"
+          echo "changelog version:   $CHANGELOG_VERSION"
+
+          if [ "$PKG_XML_VERSION" != "$CHANGELOG_VERSION" ]; then
+            echo "::error::Version mismatch! package.xml=$PKG_XML_VERSION, changelog=$CHANGELOG_VERSION"
+            exit 1
+          fi
+
+          echo "✅ Version check passed: $PKG_XML_VERSION"
+
+      - name: Tag vs changelog version check
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          CHANGELOG_VERSION=$(head -1 debian/changelog | grep -oP '\((.*?)\)' | tr -d '()' | cut -d'-' -f1)
+
+          echo "Tag version:       $TAG_VERSION"
+          echo "Changelog version: $CHANGELOG_VERSION"
+
+          if [ "$TAG_VERSION" != "$CHANGELOG_VERSION" ]; then
+            echo "::error::Version mismatch! tag=v$TAG_VERSION, changelog=$CHANGELOG_VERSION"
+            exit 1
+          fi
+
+          echo "✅ Tag matches changelog: v$TAG_VERSION"
+
+      - name: Setup ROS 2
+        if: matrix.arch == 'amd64'
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: ${{ env.ROS_DISTRO }}
+
+      - name: Add RoboParty APT source
+        run: |
+          sudo curl -fsSL https://apt.roboparty.com/roboparty.gpg \
+            -o /usr/share/keyrings/roboparty-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/roboparty-archive-keyring.gpg] https://apt.roboparty.com common main" \
+            | sudo tee /etc/apt/sources.list.d/roboparty.list
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ccache dpkg-dev debhelper devscripts \
+            git wget pkg-config python3-colcon-common-extensions \
+            libpcl-dev libeigen3-dev libceres-dev libfmt-dev libyaml-cpp-dev \
+            libboost-all-dev libapr1-dev python3-dev libpython3-dev \
+            python3-yaml python3-numpy \
+            ros-${ROS_DISTRO}-ament-cmake-auto ros-${ROS_DISTRO}-rclcpp \
+            ros-${ROS_DISTRO}-rclcpp-components ros-${ROS_DISTRO}-std-msgs \
+            ros-${ROS_DISTRO}-nav-msgs ros-${ROS_DISTRO}-sensor-msgs \
+            ros-${ROS_DISTRO}-geometry-msgs ros-${ROS_DISTRO}-visualization-msgs \
+            ros-${ROS_DISTRO}-std-srvs ros-${ROS_DISTRO}-tf2 \
+            ros-${ROS_DISTRO}-tf2-ros ros-${ROS_DISTRO}-tf2-geometry-msgs \
+            ros-${ROS_DISTRO}-pcl-ros ros-${ROS_DISTRO}-pcl-conversions \
+            ros-${ROS_DISTRO}-sophus ros-${ROS_DISTRO}-rosidl-default-generators \
+            ros-${ROS_DISTRO}-common-interfaces ros-${ROS_DISTRO}-rosbag2 \
+            ros-${ROS_DISTRO}-nav2-bringup ros-${ROS_DISTRO}-nav2-map-server \
+            ros-${ROS_DISTRO}-nav2-lifecycle-manager ros-${ROS_DISTRO}-nav2-msgs
+
+      - name: Install RoboParty SDK debs
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            roboparty-base nlink-parser-ros2 \
+            livox-sdk2 livox-sdk2-dev livox-ros-driver2 \
+            ros-${ROS_DISTRO}-serial
+
+      - name: Python syntax checks
+        run: |
+          python3 -m py_compile \
+            nav2_localization_adapter/scripts/*.py \
+            robots_localization_ros2/script/*.py
+
+      - name: Build deb packages
+        run: |
+          . /opt/ros/${ROS_DISTRO}/setup.sh
+          dpkg-buildpackage -us -uc -b
+          mv ../*.deb .
+          VERSION=$(dpkg-parsechangelog -S Version | cut -d'-' -f1 || echo "unknown")
+          echo "PKG_VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Upload deb artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: roboparty-navigation-v${{ env.PKG_VERSION }}-${{ matrix.arch }}
+          path: "*.deb"
+
+      - name: Collect release files
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          mkdir -p release
+          cp roboparty-localization_*.deb roboparty-navigation_*.deb release/
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*.deb

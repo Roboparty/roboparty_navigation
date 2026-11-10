@@ -1,0 +1,76 @@
+#!/usr/bin/make -f
+
+INSTALL_PREFIX ?= /opt/roboparty
+
+export DH_VERBOSE = 1
+export DEB_BUILD_MAINT_OPTIONS = optimize=-lto
+
+ROS_DISTRO ?= jazzy
+ROS_SETUP ?= /opt/ros/$(ROS_DISTRO)
+BUILD_ROOT := $(CURDIR)/build
+INSTALL_ROOT := $(CURDIR)/debian/tmp
+LOC_PKG := $(CURDIR)/debian/roboparty-localization
+NAV_PKG := $(CURDIR)/debian/roboparty-navigation
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	@true
+
+override_dh_auto_build:
+	# Do not bake the build host CPU into the package.
+	sed -i 's/ -march=native//g' robots_localization_ros2/CMakeLists.txt
+
+	. $(ROS_SETUP)/setup.bash && \
+	{ [ ! -f $(INSTALL_PREFIX)/setup.bash ] || . $(INSTALL_PREFIX)/setup.bash; } && \
+	colcon build \
+		--base-paths . \
+		--packages-select robots_localization nav2_localization_adapter \
+		--merge-install \
+		--build-base $(BUILD_ROOT)/colcon \
+		--install-base $(INSTALL_ROOT) \
+		--cmake-args \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_PREFIX_PATH="$(INSTALL_PREFIX):$(ROS_SETUP)" \
+			-DCMAKE_PROJECT_INCLUDE=$(CURDIR)/debian/cmake/deps.cmake \
+			-DCMAKE_INSTALL_RPATH="$(INSTALL_PREFIX)/lib;$(ROS_SETUP)/lib" \
+			-DCMAKE_BUILD_RPATH="$(INSTALL_PREFIX)/lib;$(ROS_SETUP)/lib"
+
+override_dh_auto_test:
+	@true
+
+override_dh_auto_install:
+	install -d $(LOC_PKG)$(INSTALL_PREFIX)
+	cp -a $(INSTALL_ROOT)/. $(LOC_PKG)$(INSTALL_PREFIX)/
+
+	# Split navigation-owned files out of the localization package.
+	install -d $(NAV_PKG)$(INSTALL_PREFIX)/share $(NAV_PKG)$(INSTALL_PREFIX)/lib
+	mv $(LOC_PKG)$(INSTALL_PREFIX)/share/nav2_localization_adapter $(NAV_PKG)$(INSTALL_PREFIX)/share/
+	mv $(LOC_PKG)$(INSTALL_PREFIX)/lib/nav2_localization_adapter $(NAV_PKG)$(INSTALL_PREFIX)/lib/
+
+	# Move ament/colcon index entries for the navigation package.
+	for marker in \
+		share/ament_index/resource_index/packages/nav2_localization_adapter \
+		share/ament_index/resource_index/rosidl_interfaces/nav2_localization_adapter \
+		share/colcon-core/packages/nav2_localization_adapter; do \
+		if [ -e "$(LOC_PKG)$(INSTALL_PREFIX)/$$marker" ]; then \
+			install -D "$(LOC_PKG)$(INSTALL_PREFIX)/$$marker" "$(NAV_PKG)$(INSTALL_PREFIX)/$$marker"; \
+			rm -f "$(LOC_PKG)$(INSTALL_PREFIX)/$$marker"; \
+		fi; \
+	done
+
+	# The colcon prefix itself comes from roboparty-base; keep only the
+	# package-level local_setup files.
+	rm -f $(LOC_PKG)$(INSTALL_PREFIX)/setup.* \
+		$(LOC_PKG)$(INSTALL_PREFIX)/local_setup.* \
+		$(LOC_PKG)$(INSTALL_PREFIX)/_local_setup_util_*.py
+
+override_dh_auto_clean:
+	rm -rf $(BUILD_ROOT) $(INSTALL_ROOT)
+
+override_dh_shlibdeps:
+	dh_shlibdeps -- -l$(INSTALL_PREFIX)/lib --ignore-missing-info
+
+override_dh_missing:
+	@true

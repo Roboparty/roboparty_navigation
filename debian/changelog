@@ -1,0 +1,10 @@
+roboparty-navigation (1.0.0-1) stable; urgency=medium
+
+  * Initial packaging.
+  * Split the runtime into roboparty-localization (FAST-LIO based
+    localization, no Nav2 dependency) and roboparty-navigation (Nav2
+    adapter).
+  * Keep both packages on the shared install prefix (default /opt/roboparty) so
+    roboparty-base/setup.bash discovers them automatically.
+
+ -- RoboParty <2321901849@qq.com>  Sat, 07 Nov 2026 00:00:00 +0800
