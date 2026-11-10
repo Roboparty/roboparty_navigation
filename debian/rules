@@ -28,7 +28,7 @@ override_dh_auto_build:
 	{ [ ! -f $(INSTALL_PREFIX)/setup.bash ] || . $(INSTALL_PREFIX)/setup.bash; } && \
 	colcon build \
 		--base-paths . \
-		--packages-select robots_localization nav2_localization_adapter \
+		--packages-up-to robots_localization nav2_localization_adapter \
 		--merge-install \
 		--build-base $(BUILD_ROOT)/colcon \
 		--install-base $(INSTALL_ROOT) \
