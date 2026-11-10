@@ -81,16 +81,22 @@ jobs:
 
       - name: Add RoboParty APT source
         run: |
-          curl -fsSL https://apt.roboparty.com/roboparty.gpg \
-            | gpg --dearmor \
-            | sudo tee /usr/share/keyrings/roboparty-archive-keyring.gpg >/dev/null
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/roboparty-archive-keyring.gpg] https://apt.roboparty.com common main" \
-            | sudo tee /etc/apt/sources.list.d/roboparty.list
+          keyring="$RUNNER_TEMP/roboparty-archive-keyring.gpg"
+          sources="$RUNNER_TEMP/apt-sources"
+          curl -fsSL https://apt.roboparty.com/roboparty.gpg | gpg --dearmor > "$keyring"
+          mkdir -p "$sources"
+          cp /etc/apt/sources.list.d/*.list "$sources"/ 2>/dev/null || true
+          cp /etc/apt/sources.list.d/*.sources "$sources"/ 2>/dev/null || true
+          if [ -s /etc/apt/sources.list ]; then
+            cp /etc/apt/sources.list "$sources/ubuntu.list"
+          fi
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] https://apt.roboparty.com common main" > "$sources/roboparty.list"
+          echo "APT_OPTS=-o Dir::Etc::sourcelist=/dev/null -o Dir::Etc::sourceparts=$sources" >> "$GITHUB_ENV"
 
       - name: Install build tools
         run: |
-          sudo apt-get update -q
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get $APT_OPTS update -q
+          sudo apt-get $APT_OPTS install -y --no-install-recommends \
             build-essential cmake ccache dpkg-dev debhelper devscripts \
             git wget pkg-config python3-colcon-common-extensions \
             libpcl-dev libeigen3-dev libceres-dev libfmt-dev libyaml-cpp-dev \
@@ -110,7 +116,7 @@ jobs:
 
       - name: Install RoboParty SDK debs
         run: |
-          sudo apt-get install -y --no-install-recommends \
+          sudo apt-get $APT_OPTS install -y --no-install-recommends \
             roboparty-base nlink-parser-ros2 \
             livox-sdk2 livox-sdk2-dev livox-ros-driver2 \
             ros-${ROS_DISTRO}-serial
