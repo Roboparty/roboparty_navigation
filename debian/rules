@@ -1,5 +1,7 @@
 #!/usr/bin/make -f
 
+SHELL := /bin/bash
+
 INSTALL_PREFIX ?= /opt/roboparty
 
 export DH_VERBOSE = 1
