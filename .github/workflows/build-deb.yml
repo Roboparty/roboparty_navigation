@@ -26,7 +26,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+
+      - name: Checkout submodules
+        run: |
+          git submodule sync --recursive
+          for attempt in 1 2 3 4 5; do
+            if git submodule update --init --force --recursive --depth=1; then
+              exit 0
+            fi
+            echo "::warning::submodule checkout failed (attempt $attempt)"
+            git submodule deinit -f --all || true
+            sleep 15
+          done
+          echo "::error::submodule checkout failed after retries"
+          exit 1
 
       - name: Version check (package.xml vs changelog)
         run: |
@@ -67,8 +81,9 @@ jobs:
 
       - name: Add RoboParty APT source
         run: |
-          sudo curl -fsSL https://apt.roboparty.com/roboparty.gpg \
-            -o /usr/share/keyrings/roboparty-archive-keyring.gpg
+          curl -fsSL https://apt.roboparty.com/roboparty.gpg \
+            | gpg --dearmor \
+            | sudo tee /usr/share/keyrings/roboparty-archive-keyring.gpg >/dev/null
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/roboparty-archive-keyring.gpg] https://apt.roboparty.com common main" \
             | sudo tee /etc/apt/sources.list.d/roboparty.list
 
