@@ -81,16 +81,20 @@ jobs:
 
       - name: Add RoboParty APT source
         run: |
-          keyring="$RUNNER_TEMP/roboparty-archive-keyring.gpg"
-          sources="$RUNNER_TEMP/apt-sources"
+          keyring="/tmp/roboparty-archive-keyring-${GITHUB_RUN_ID}.gpg"
+          sources="/tmp/roboparty-apt-${GITHUB_RUN_ID}"
           curl -fsSL https://apt.roboparty.com/roboparty.gpg | gpg --dearmor > "$keyring"
+          chmod 644 "$keyring"
+          rm -rf "$sources"
           mkdir -p "$sources"
+          chmod 755 "$sources"
           cp /etc/apt/sources.list.d/*.list "$sources"/ 2>/dev/null || true
           cp /etc/apt/sources.list.d/*.sources "$sources"/ 2>/dev/null || true
           if [ -s /etc/apt/sources.list ]; then
             cp /etc/apt/sources.list "$sources/ubuntu.list"
           fi
           echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] https://apt.roboparty.com common main" > "$sources/roboparty.list"
+          chmod 644 "$sources"/* 2>/dev/null || true
           echo "APT_OPTS=-o Dir::Etc::sourcelist=/dev/null -o Dir::Etc::sourceparts=$sources" >> "$GITHUB_ENV"
 
       - name: Install build tools

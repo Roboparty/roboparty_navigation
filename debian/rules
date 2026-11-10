@@ -37,7 +37,8 @@ override_dh_auto_build:
 			-DCMAKE_PREFIX_PATH="$(INSTALL_PREFIX):$(ROS_SETUP)" \
 			-DCMAKE_PROJECT_INCLUDE=$(CURDIR)/debian/cmake/deps.cmake \
 			-DCMAKE_INSTALL_RPATH="$(INSTALL_PREFIX)/lib;$(ROS_SETUP)/lib" \
-			-DCMAKE_BUILD_RPATH="$(INSTALL_PREFIX)/lib;$(ROS_SETUP)/lib"
+			-DCMAKE_BUILD_RPATH="$(INSTALL_PREFIX)/lib;$(ROS_SETUP)/lib" \
+			-DSophus_INCLUDE_DIRS="$(ROS_SETUP)/include"
 
 override_dh_auto_test:
 	@true
