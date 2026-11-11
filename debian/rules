@@ -10,7 +10,7 @@ export DEB_BUILD_MAINT_OPTIONS = optimize=-lto
 ROS_DISTRO ?= jazzy
 ROS_SETUP ?= /opt/ros/$(ROS_DISTRO)
 BUILD_ROOT := $(CURDIR)/build
-INSTALL_ROOT := $(CURDIR)/debian/tmp
+INSTALL_ROOT := $(CURDIR)/debian/colcon-install
 LOC_PKG := $(CURDIR)/debian/roboparty-localization
 NAV_PKG := $(CURDIR)/debian/roboparty-navigation
 

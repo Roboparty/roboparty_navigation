@@ -118,12 +118,46 @@ jobs:
             ros-${ROS_DISTRO}-nav2-bringup ros-${ROS_DISTRO}-nav2-map-server \
             ros-${ROS_DISTRO}-nav2-lifecycle-manager ros-${ROS_DISTRO}-nav2-msgs
 
+      - name: Download RoboParty SDK debs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          out="/tmp/roboparty-debs-${GITHUB_RUN_ID}"
+          rm -rf "$out"
+          mkdir -p "$out"
+          chmod 755 "$out"
+          DEB_ARCH=$(dpkg --print-architecture) OUT_DIR="$out" python3 - <<'PY'
+          import json, os, pathlib, urllib.request
+
+          arch = os.environ["DEB_ARCH"]
+          out = pathlib.Path(os.environ["OUT_DIR"])
+          headers = {"Accept": "application/vnd.github+json"}
+          token = os.environ.get("GH_TOKEN")
+          if token:
+              headers["Authorization"] = f"Bearer {token}"
+          repos = {
+              "Roboparty/nlink_parser_ros2": "nlink-parser-ros2",
+              "Roboparty/livox_ros_driver2": "livox-ros-driver2",
+              "Roboparty/Livox-SDK2": "livox-sdk2",
+              "Roboparty/serial": "ros-jazzy-serial",
+          }
+          for repo, prefix in repos.items():
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{repo}/releases/latest", headers=headers)
+              with urllib.request.urlopen(req) as response:
+                  data = json.load(response)
+              for asset in data.get("assets", []):
+                  name = asset["name"]
+                  if name.startswith(prefix) and name.endswith(f"_{arch}.deb"):
+                      print(f"download {name}")
+                      urllib.request.urlretrieve(asset["browser_download_url"], out / name)
+          PY
+          chmod 644 "$out"/*
+
       - name: Install RoboParty SDK debs
         run: |
-          sudo apt-get $APT_OPTS install -y --no-install-recommends \
-            roboparty-base nlink-parser-ros2 \
-            livox-sdk2 livox-sdk2-dev livox-ros-driver2 \
-            ros-${ROS_DISTRO}-serial
+          sudo apt-get $APT_OPTS install -y --no-install-recommends roboparty-base
+          sudo apt-get $APT_OPTS install -y /tmp/roboparty-debs-${GITHUB_RUN_ID}/*.deb
 
       - name: Python syntax checks
         run: |
