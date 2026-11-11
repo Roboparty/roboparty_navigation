@@ -127,7 +127,7 @@ jobs:
           mkdir -p "$out"
           chmod 755 "$out"
           DEB_ARCH=$(dpkg --print-architecture) OUT_DIR="$out" python3 - <<'PY'
-          import json, os, pathlib, urllib.request
+          import json, os, pathlib, shutil, time, urllib.request
 
           arch = os.environ["DEB_ARCH"]
           out = pathlib.Path(os.environ["OUT_DIR"])
@@ -135,6 +135,18 @@ jobs:
           token = os.environ.get("GH_TOKEN")
           if token:
               headers["Authorization"] = f"Bearer {token}"
+
+          def download(url, dest):
+              for attempt in range(1, 6):
+                  try:
+                      with urllib.request.urlopen(url, timeout=90) as response, open(dest, "wb") as target:
+                          shutil.copyfileobj(response, target)
+                      return
+                  except Exception as exc:
+                      print(f"download failed (attempt {attempt}): {exc}")
+                      time.sleep(10)
+              raise RuntimeError(f"could not download {url}")
+
           repos = {
               "Roboparty/nlink_parser_ros2": "nlink-parser-ros2",
               "Roboparty/livox_ros_driver2": "livox-ros-driver2",
@@ -144,13 +156,13 @@ jobs:
           for repo, prefix in repos.items():
               req = urllib.request.Request(
                   f"https://api.github.com/repos/{repo}/releases/latest", headers=headers)
-              with urllib.request.urlopen(req) as response:
+              with urllib.request.urlopen(req, timeout=90) as response:
                   data = json.load(response)
               for asset in data.get("assets", []):
                   name = asset["name"]
                   if name.startswith(prefix) and name.endswith(f"_{arch}.deb"):
                       print(f"download {name}")
-                      urllib.request.urlretrieve(asset["browser_download_url"], out / name)
+                      download(asset["browser_download_url"], out / name)
           PY
           chmod 644 "$out"/*
 
